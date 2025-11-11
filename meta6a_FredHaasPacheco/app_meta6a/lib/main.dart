@@ -41,10 +41,96 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _showPersonasRegistradas() {
+    // IDs y nombres de personas registradas
+    final personas = [
+      {'id': '11', 'nombre': 'Anthony Tenorio', 'sexo': 'Hombres'},
+      {'id': '12', 'nombre': 'Michael Geampierre Marquez Plaza', 'sexo': 'Hombres'},
+      {'id': '10', 'nombre': 'Karina Isabel Renteria Valencia', 'sexo': 'Mujer'},
+      {'id': '13', 'nombre': 'Pierina Lilibet Ventes Loor', 'sexo': 'Mujer'},
+      {'id': '16', 'nombre': 'Tamara Betzabet Becerra Navarrete', 'sexo': 'Mujer'},
+      {'id': '18', 'nombre': 'Andrea Stefanía Quiñónez Tafur', 'sexo': 'Binario'},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('📋 Personas Registradas'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...personas.map((p) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blue),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Center(
+                          child: Text(
+                            p['id']!,
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p['nombre']!,
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Sexo: ${p['sexo']}',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("SICA - Registro")), // Título de la AppBar
+      appBar: AppBar(
+        title: Text("SICA - Registro"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.people_alt),
+            tooltip: 'Ver personas registradas',
+            onPressed: _showPersonasRegistradas,
+          ),
+        ],
+      ),
       body: _pages[_selectedIndex], // Muestra la página seleccionada
       bottomNavigationBar: BottomNavigationBar(
         items: const [
@@ -83,13 +169,15 @@ class Sexo {
 class Telefono {
   final String idtelefono;
   final String numero;
+  final String? idpersona;
 
-  Telefono({required this.idtelefono, required this.numero});
+  Telefono({required this.idtelefono, required this.numero, this.idpersona});
 
   factory Telefono.fromJson(Map<String, dynamic> json) {
     return Telefono(
       idtelefono: json['idtelefono'].toString(),
       numero: json['numero'],
+      idpersona: json['idpersona']?.toString(),
     );
   }
 }
@@ -106,15 +194,19 @@ class Persona {
   final String nombres;
   final String apellidos;
   final String elsexo;
+  final String idsexo;
   final String elestadocivil;
-  final String fechanacimiento; // Asumiendo que viene como String
+  final String idestadocivil;
+  final String fechanacimiento;
 
   Persona({
     required this.idpersona,
     required this.nombres,
     required this.apellidos,
     required this.elsexo,
+    required this.idsexo,
     required this.elestadocivil,
+    required this.idestadocivil,
     required this.fechanacimiento,
   });
 
@@ -124,7 +216,9 @@ class Persona {
       nombres: json['nombres'] ?? 'N/A',
       apellidos: json['apellidos'] ?? 'N/A',
       elsexo: json['elsexo'] ?? 'N/A',
+      idsexo: json['idsexo']?.toString() ?? '',
       elestadocivil: json['elestadocivil'] ?? 'N/A',
+      idestadocivil: json['idestadocivil']?.toString() ?? '',
       fechanacimiento: json['fechanacimiento'] ?? 'N/A',
     );
   }
@@ -141,7 +235,6 @@ class SexoPage extends StatefulWidget {
 class _SexoPageState extends State<SexoPage> {
   List<Sexo> _sexoList = [];
   List<Sexo> _filteredSexoList = [];
-  String _searchText = '';
   bool _isLoading = true; // Para mostrar un indicador de carga
 
   @override
@@ -177,7 +270,6 @@ class _SexoPageState extends State<SexoPage> {
 
   void _filterSearch(String query) {
     setState(() {
-      _searchText = query;
       _filteredSexoList = _sexoList
           .where((item) =>
               item.nombre.toLowerCase().contains(query.toLowerCase()) ||
@@ -186,23 +278,144 @@ class _SexoPageState extends State<SexoPage> {
     });
   }
 
+  // --- CRUD helpers for Sexo ---
+  void _showSexoForm({Sexo? sexo}) {
+    final _formKey = GlobalKey<FormState>();
+    String nombre = sexo?.nombre ?? '';
+    String idsexo = sexo?.idsexo ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(sexo == null ? 'Crear Sexo' : 'Actualizar Sexo'),
+        content: Form(
+          key: _formKey,
+          child: TextFormField(
+            initialValue: nombre,
+            decoration: InputDecoration(labelText: 'Nombre'),
+            validator: (v) => (v == null || v.isEmpty) ? 'Ingrese nombre' : null,
+            onSaved: (v) => nombre = v ?? '',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!_formKey.currentState!.validate()) return;
+              _formKey.currentState!.save();
+              try {
+                if (sexo == null) {
+                  // enviar form-urlencoded
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/SexoController.php?action=create'),
+                    body: {'nombre': nombre},
+                  );
+                  print('POST Sexo status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('creado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showSnackbar('Sexo creado');
+                    await _fetchSexoData();
+                  } else {
+                    _showSnackbar('Error crear: ${resp.statusCode}', isError: true);
+                  }
+                } else {
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/SexoController.php?action=update'),
+                    body: {'idsexo': idsexo, 'nombre': nombre},
+                  );
+                  print('UPDATE Sexo status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('actualizado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showSnackbar('Sexo actualizado');
+                    await _fetchSexoData();
+                  } else {
+                    _showSnackbar('Error actualizar: ${resp.statusCode}', isError: true);
+                  }
+                }
+              } catch (e) {
+                print('Exception sexo save: $e');
+                _showSnackbar('Excepción: $e', isError: true);
+              }
+            },
+            child: Text(sexo == null ? 'Crear' : 'Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteSexo(String idsexo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirmar'),
+        content: Text('Eliminar este registro?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              try {
+                // many PHP backends expect form data even for delete
+                final resp = await http.post(
+                  Uri.parse('https://educaysoft.org/apple6b/app/controllers/SexoController.php?action=delete'),
+                  body: {'idsexo': idsexo},
+                );
+                print('DELETE Sexo status=${resp.statusCode} body=${resp.body}');
+                if (resp.statusCode == 200 || resp.body.contains('eliminado') || resp.body.contains('success')) {
+                  Navigator.pop(context);
+                  _showSnackbar('Sexo eliminado');
+                  await _fetchSexoData();
+                } else {
+                  _showSnackbar('Error eliminar: ${resp.statusCode}', isError: true);
+                }
+              } catch (e) {
+                print('Exception delete sexo: $e');
+                _showSnackbar('Excepción: $e', isError: true);
+              }
+            },
+            child: Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnackbar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Barra de búsqueda
+        // Barra de búsqueda + crear
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            onChanged: _filterSearch,
-            decoration: InputDecoration(
-              labelText: 'Buscar Sexo',
-              hintText: 'Ingrese nombres o ID',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: _filterSearch,
+                  decoration: InputDecoration(
+                    labelText: 'Buscar Sexo',
+                    hintText: 'Ingrese nombres o ID',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              SizedBox(width: 10),
+              FloatingActionButton(
+                onPressed: () => _showSexoForm(),
+                child: Icon(Icons.add),
+                tooltip: 'Crear Sexo',
+              ),
+            ],
           ),
         ),
         // Lista de registros
@@ -225,11 +438,19 @@ class _SexoPageState extends State<SexoPage> {
                             leading: Icon(Icons.people, color: Colors.blueAccent),
                             title: Text(sexo.nombre, style: TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text("ID: ${sexo.idsexo}"),
-                            trailing: Icon(Icons.arrow_forward_ios, size: 16.0),
-                            onTap: () {
-                              // Acción al hacer tap en un elemento de sexo
-                              print('Sexo seleccionado: ${sexo.nombre}');
-                            },
+                            trailing: PopupMenuButton(
+                              itemBuilder: (BuildContext context) => [
+                                PopupMenuItem(child: Text('Editar'), value: 'edit'),
+                                PopupMenuItem(child: Text('Eliminar', style: TextStyle(color: Colors.red)), value: 'delete'),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showSexoForm(sexo: sexo);
+                                } else if (value == 'delete') {
+                                  _deleteSexo(sexo.idsexo);
+                                }
+                              },
+                            ),
                           ),
                         );
                       },
@@ -259,7 +480,6 @@ class TelefonoPage extends StatefulWidget {
 class _TelefonoPageState extends State<TelefonoPage> {
   List<Telefono> _telefonoList = [];
   List<Telefono> _filteredTelefonoList = [];
-  String _searchText = '';
   bool _isLoading = true; // Para mostrar un indicador de carga
 
   @override
@@ -295,7 +515,6 @@ class _TelefonoPageState extends State<TelefonoPage> {
 
   void _filterSearch(String query) {
     setState(() {
-      _searchText = query;
       _filteredTelefonoList = _telefonoList
           .where((item) =>
               item.numero.toLowerCase().contains(query.toLowerCase()) ||
@@ -304,23 +523,135 @@ class _TelefonoPageState extends State<TelefonoPage> {
     });
   }
 
+  // --- CRUD helpers for Telefono ---
+  void _showTelefonoForm({Telefono? telefono}) {
+    final _formKey = GlobalKey<FormState>();
+    String numero = telefono?.numero ?? '';
+    String idtelefono = telefono?.idtelefono ?? '';
+    String idpersona = telefono?.idpersona ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(telefono == null ? 'Crear Teléfono' : 'Actualizar Teléfono'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                initialValue: numero,
+                decoration: InputDecoration(labelText: 'Número'),
+                validator: (v) => (v == null || v.isEmpty) ? 'Ingrese número' : null,
+                onSaved: (v) => numero = v ?? '',
+              ),
+              SizedBox(height: 8),
+              TextFormField(
+                initialValue: idpersona,
+                decoration: InputDecoration(labelText: 'ID Persona'),
+                validator: (v) => (v == null || v.isEmpty) ? 'Ingrese ID Persona' : null,
+                onSaved: (v) => idpersona = v ?? '',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!_formKey.currentState!.validate()) return;
+              _formKey.currentState!.save();
+              try {
+                if (telefono == null) {
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/TelefonoController.php?action=create'),
+                    body: {'numero': numero, 'idpersona': idpersona},
+                  );
+                  print('POST Telefono status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('creado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showTelefonoSnackbar('Teléfono creado');
+                    await _fetchTelefonoData();
+                  } else {
+                    _showTelefonoSnackbar('Error crear: ${resp.statusCode}', isError: true);
+                  }
+                } else {
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/TelefonoController.php?action=update'),
+                    body: {'idtelefono': idtelefono, 'numero': numero, 'idpersona': idpersona},
+                  );
+                  print('UPDATE Telefono status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('actualizado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showTelefonoSnackbar('Teléfono actualizado');
+                    await _fetchTelefonoData();
+                  } else {
+                    _showTelefonoSnackbar('Error actualizar: ${resp.statusCode}', isError: true);
+                  }
+                }
+              } catch (e) {
+                print('Exception telefono save: $e');
+                _showTelefonoSnackbar('Excepción: $e', isError: true);
+              }
+            },
+            child: Text(telefono == null ? 'Crear' : 'Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteTelefono(String idtelefono, String idpersona) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Eliminar Teléfono'),
+        content: Text('⚠️ La función de eliminar Teléfono no está disponible en el servidor.\n\nContacte al administrador.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTelefonoSnackbar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Barra de búsqueda
+        // Barra de búsqueda + crear
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            onChanged: _filterSearch,
-            decoration: InputDecoration(
-              labelText: 'Buscar Telefono',
-              hintText: 'Ingrese numeros o ID',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: _filterSearch,
+                  decoration: InputDecoration(
+                    labelText: 'Buscar Teléfono',
+                    hintText: 'Ingrese números o ID',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              SizedBox(width: 10),
+              FloatingActionButton(
+                onPressed: () => _showTelefonoForm(),
+                child: Icon(Icons.add),
+                tooltip: 'Crear Teléfono',
+              ),
+            ],
           ),
         ),
         // Lista de registros
@@ -343,11 +674,19 @@ class _TelefonoPageState extends State<TelefonoPage> {
                             leading: Icon(Icons.people, color: Colors.blueAccent),
                             title: Text(telefono.numero, style: TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text("ID: ${telefono.idtelefono}"),
-                            trailing: Icon(Icons.arrow_forward_ios, size: 16.0),
-                            onTap: () {
-                              // Acción al hacer tap en un elemento de telefono
-                              print('Telefono seleccionado: ${telefono.numero}');
-                            },
+                            trailing: PopupMenuButton(
+                              itemBuilder: (BuildContext context) => [
+                                PopupMenuItem(child: Text('Editar'), value: 'edit'),
+                                PopupMenuItem(child: Text('Eliminar', style: TextStyle(color: Colors.red)), value: 'delete'),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showTelefonoForm(telefono: telefono);
+                                } else if (value == 'delete') {
+                                  _deleteTelefono(telefono.idtelefono, telefono.idpersona ?? '');
+                                }
+                              },
+                            ),
                           ),
                         );
                       },
@@ -367,7 +706,6 @@ class PersonaPage extends StatefulWidget {
 class _PersonaPageState extends State<PersonaPage> {
   List<Persona> _personaList = [];
   List<Persona> _filteredPersonaList = [];
-  String _searchText = '';
   bool _isLoading = true; // Para mostrar un indicador de carga
 
   @override
@@ -403,7 +741,6 @@ class _PersonaPageState extends State<PersonaPage> {
 
   void _filterSearch(String query) {
     setState(() {
-      _searchText = query;
       _filteredPersonaList = _personaList
           .where((item) =>
               item.nombres.toLowerCase().contains(query.toLowerCase()) ||
@@ -413,23 +750,194 @@ class _PersonaPageState extends State<PersonaPage> {
     });
   }
 
+  // --- CRUD helpers for Persona ---
+  void _showPersonaForm({Persona? persona}) {
+    final _formKey = GlobalKey<FormState>();
+    String nombres = persona?.nombres ?? '';
+    String apellidos = persona?.apellidos ?? '';
+    String idsexo = persona?.idsexo ?? '';
+    String idestadocivil = persona?.idestadocivil ?? '';
+    String fechanacimiento = persona?.fechanacimiento ?? '';
+    String idpersona = persona?.idpersona ?? '';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(persona == null ? 'Crear Persona' : 'Actualizar Persona'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: nombres,
+                  decoration: InputDecoration(labelText: 'Nombres'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Ingrese nombres' : null,
+                  onSaved: (v) => nombres = v ?? '',
+                ),
+                SizedBox(height: 8),
+                TextFormField(
+                  initialValue: apellidos,
+                  decoration: InputDecoration(labelText: 'Apellidos'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Ingrese apellidos' : null,
+                  onSaved: (v) => apellidos = v ?? '',
+                ),
+                SizedBox(height: 8),
+                TextFormField(
+                  initialValue: idsexo,
+                  decoration: InputDecoration(labelText: 'ID Sexo (1=Hombres, 2=Mujer, 21=Desconocido)'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Ingrese ID Sexo' : null,
+                  onSaved: (v) => idsexo = v ?? '',
+                ),
+                SizedBox(height: 8),
+                TextFormField(
+                  initialValue: idestadocivil,
+                  decoration: InputDecoration(labelText: 'ID Estado Civil (1=Soltero/a, 2=Casado)'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Ingrese ID Estado Civil' : null,
+                  onSaved: (v) => idestadocivil = v ?? '',
+                ),
+                SizedBox(height: 8),
+                TextFormField(
+                  initialValue: fechanacimiento,
+                  decoration: InputDecoration(labelText: 'Fecha Nacimiento (YYYY-MM-DD)'),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Ingrese fecha' : null,
+                  onSaved: (v) => fechanacimiento = v ?? '',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              if (!_formKey.currentState!.validate()) return;
+              _formKey.currentState!.save();
+              try {
+                if (persona == null) {
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/PersonaController.php?action=create'),
+                    body: {
+                      'nombres': nombres,
+                      'apellidos': apellidos,
+                      'idsexo': idsexo,
+                      'idestadocivil': idestadocivil,
+                      'fechanacimiento': fechanacimiento,
+                    },
+                  );
+                  print('POST Persona status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('creada') || resp.body.contains('creado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showPersonaSnackbar('Persona creada');
+                    await _fetchPersonaData();
+                  } else {
+                    _showPersonaSnackbar('Error crear: ${resp.statusCode}', isError: true);
+                  }
+                } else {
+                  final resp = await http.post(
+                    Uri.parse('https://educaysoft.org/apple6b/app/controllers/PersonaController.php?action=update'),
+                    body: {
+                      'idpersona': idpersona,
+                      'nombres': nombres,
+                      'apellidos': apellidos,
+                      'idsexo': idsexo,
+                      'idestadocivil': idestadocivil,
+                      'fechanacimiento': fechanacimiento,
+                    },
+                  );
+                  print('UPDATE Persona status=${resp.statusCode} body=${resp.body}');
+                  if (resp.statusCode == 200 || resp.body.contains('actualizada') || resp.body.contains('actualizado') || resp.body.contains('success')) {
+                    Navigator.pop(context);
+                    _showPersonaSnackbar('Persona actualizada');
+                    await _fetchPersonaData();
+                  } else {
+                    _showPersonaSnackbar('Error actualizar: ${resp.statusCode}', isError: true);
+                  }
+                }
+              } catch (e) {
+                print('Exception persona save: $e');
+                _showPersonaSnackbar('Excepción: $e', isError: true);
+              }
+            },
+            child: Text(persona == null ? 'Crear' : 'Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deletePersona(String idpersona, String idsexo, String idestadocivil) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirmar'),
+        content: Text('Eliminar este registro?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              try {
+                final resp = await http.post(
+                  Uri.parse('https://educaysoft.org/apple6b/app/controllers/PersonaController.php?action=delete'),
+                  body: {'idpersona': idpersona, 'idsexo': idsexo, 'idestadocivil': idestadocivil},
+                );
+                print('DELETE Persona status=${resp.statusCode} body=${resp.body}');
+                if (resp.statusCode == 200 || resp.body.contains('eliminada') || resp.body.contains('eliminado') || resp.body.contains('success')) {
+                  Navigator.pop(context);
+                  _showPersonaSnackbar('Persona eliminada');
+                  await _fetchPersonaData();
+                } else {
+                  _showPersonaSnackbar('Error eliminar: ${resp.statusCode}', isError: true);
+                }
+              } catch (e) {
+                print('Exception delete persona: $e');
+                _showPersonaSnackbar('Excepción: $e', isError: true);
+              }
+            },
+            child: Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPersonaSnackbar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Barra de búsqueda
+        // Barra de búsqueda + crear
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: TextField(
-            onChanged: _filterSearch,
-            decoration: InputDecoration(
-              labelText: 'Buscar Persona',
-              hintText: 'Ingrese nombres, apellidos o cédula',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: _filterSearch,
+                  decoration: InputDecoration(
+                    labelText: 'Buscar Persona',
+                    hintText: 'Ingrese nombres, apellidos o cédula',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              SizedBox(width: 10),
+              FloatingActionButton(
+                onPressed: () => _showPersonaForm(),
+                child: Icon(Icons.add),
+                tooltip: 'Crear Persona',
+              ),
+            ],
           ),
         ),
         // Lista de registros
@@ -459,11 +967,19 @@ class _PersonaPageState extends State<PersonaPage> {
                                 Text("Estado Civil: ${persona.elestadocivil}"),
                               ],
                             ),
-                            trailing: Icon(Icons.arrow_forward_ios, size: 16.0),
-                            onTap: () {
-                              // Acción al hacer tap en un elemento de persona
-                              print('Persona seleccionada: ${persona.nombres} ${persona.apellidos}');
-                            },
+                            trailing: PopupMenuButton(
+                              itemBuilder: (BuildContext context) => [
+                                PopupMenuItem(child: Text('Editar'), value: 'edit'),
+                                PopupMenuItem(child: Text('Eliminar', style: TextStyle(color: Colors.red)), value: 'delete'),
+                              ],
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showPersonaForm(persona: persona);
+                                } else if (value == 'delete') {
+                                  _deletePersona(persona.idpersona, persona.idsexo, persona.idestadocivil);
+                                }
+                              },
+                            ),
                           ),
                         );
                       },
